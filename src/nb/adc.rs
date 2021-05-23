@@ -1,7 +1,5 @@
 //! Analog-digital conversion traits
 
-use nb;
-
 /// A marker trait to identify MCU pins that can be used as inputs to an ADC channel.
 ///
 /// This marker trait denotes an object, i.e. a GPIO pin, that is ready for use as an input to the
@@ -10,7 +8,7 @@ use nb;
 ///
 /// ```
 /// # use core::marker::PhantomData;
-/// # use embedded_hal::adc::Channel;
+/// # use embedded_hal::nb::adc::Channel;
 ///
 /// struct Adc1; // Example ADC with single bank of 8 channels
 /// struct Gpio1Pin1<MODE>(PhantomData<MODE>);
@@ -57,7 +55,7 @@ pub trait Channel<ADC> {
 /// of the request (in contrast to continuous asynchronous sampling).
 ///
 /// ```
-/// use embedded_hal::adc::{Channel, OneShot};
+/// use embedded_hal::nb::adc::{Channel, OneShot};
 ///
 /// struct MyAdc; // 10-bit ADC, with 5 channels
 /// # impl MyAdc {
@@ -73,7 +71,7 @@ pub trait Channel<ADC> {
 /// {
 ///    type Error = ();
 ///
-///    fn try_read(&mut self, pin: &mut PIN) -> nb::Result<WORD, Self::Error> {
+///    fn read(&mut self, pin: &mut PIN) -> nb::Result<WORD, Self::Error> {
 ///        let chan = 1 << pin.channel();
 ///        self.power_up();
 ///        let result = self.do_conversion(chan);
@@ -90,5 +88,5 @@ pub trait OneShot<ADC, Word, Pin: Channel<ADC>> {
     ///
     /// This method takes a `Pin` reference, as it is expected that the ADC will be able to sample
     /// whatever channel underlies the pin.
-    fn try_read(&mut self, pin: &mut Pin) -> nb::Result<Word, Self::Error>;
+    fn read(&mut self, pin: &mut Pin) -> nb::Result<Word, Self::Error>;
 }

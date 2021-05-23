@@ -3,15 +3,14 @@
 //! TODO write example of usage
 use core::fmt::{Result, Write};
 
-impl<Word, Error> Write for dyn crate::serial::Write<Word, Error = Error> + '_
+impl<Word, Error> Write for dyn crate::nb::serial::Write<Word, Error = Error> + '_
 where
     Word: From<u8>,
 {
     fn write_str(&mut self, s: &str) -> Result {
         let _ = s
-            .as_bytes()
-            .into_iter()
-            .map(|c| nb::block!(self.try_write(Word::from(*c))))
+            .bytes()
+            .map(|c| nb::block!(self.write(Word::from(c))))
             .last();
         Ok(())
     }

@@ -7,7 +7,7 @@ use core::{convert::From, ops::Not};
 /// Conversion from `bool` and logical negation are also implemented
 /// for this type.
 /// ```rust
-/// # use embedded_hal::digital::PinState;
+/// # use embedded_hal::blocking::digital::PinState;
 /// let state = PinState::from(false);
 /// assert_eq!(state, PinState::Low);
 /// assert_eq!(!state, PinState::High);
@@ -49,22 +49,22 @@ pub trait OutputPin {
     ///
     /// *NOTE* the actual electrical state of the pin may not actually be low, e.g. due to external
     /// electrical sources
-    fn try_set_low(&mut self) -> Result<(), Self::Error>;
+    fn set_low(&mut self) -> Result<(), Self::Error>;
 
     /// Drives the pin high
     ///
     /// *NOTE* the actual electrical state of the pin may not actually be high, e.g. due to external
     /// electrical sources
-    fn try_set_high(&mut self) -> Result<(), Self::Error>;
+    fn set_high(&mut self) -> Result<(), Self::Error>;
 
     /// Drives the pin high or low depending on the provided value
     ///
     /// *NOTE* the actual electrical state of the pin may not actually be high or low, e.g. due to external
     /// electrical sources
-    fn try_set_state(&mut self, state: PinState) -> Result<(), Self::Error> {
+    fn set_state(&mut self, state: PinState) -> Result<(), Self::Error> {
         match state {
-            PinState::Low => self.try_set_low(),
-            PinState::High => self.try_set_high(),
+            PinState::Low => self.set_low(),
+            PinState::High => self.set_high(),
         }
     }
 }
@@ -74,12 +74,12 @@ pub trait StatefulOutputPin: OutputPin {
     /// Is the pin in drive high mode?
     ///
     /// *NOTE* this does *not* read the electrical state of the pin
-    fn try_is_set_high(&self) -> Result<bool, Self::Error>;
+    fn is_set_high(&self) -> Result<bool, Self::Error>;
 
     /// Is the pin in drive low mode?
     ///
     /// *NOTE* this does *not* read the electrical state of the pin
-    fn try_is_set_low(&self) -> Result<bool, Self::Error>;
+    fn is_set_low(&self) -> Result<bool, Self::Error>;
 }
 
 /// Output pin that can be toggled
@@ -93,15 +93,15 @@ pub trait ToggleableOutputPin {
     type Error;
 
     /// Toggle pin output.
-    fn try_toggle(&mut self) -> Result<(), Self::Error>;
+    fn toggle(&mut self) -> Result<(), Self::Error>;
 }
 
 /// If you can read **and** write the output state, a pin is
 /// toggleable by software.
 ///
 /// ```
-/// use embedded_hal::digital::{OutputPin, StatefulOutputPin, ToggleableOutputPin};
-/// use embedded_hal::digital::toggleable;
+/// use embedded_hal::blocking::digital::{OutputPin, StatefulOutputPin, ToggleableOutputPin};
+/// use embedded_hal::blocking::digital::toggleable;
 /// use core::convert::Infallible;
 ///
 /// /// A virtual output pin that exists purely in software
@@ -112,21 +112,21 @@ pub trait ToggleableOutputPin {
 /// impl OutputPin for MyPin {
 ///    type Error = Infallible;
 ///
-///    fn try_set_low(&mut self) -> Result<(), Self::Error> {
+///    fn set_low(&mut self) -> Result<(), Self::Error> {
 ///        self.state = false;
 ///        Ok(())
 ///    }
-///    fn try_set_high(&mut self) -> Result<(), Self::Error> {
+///    fn set_high(&mut self) -> Result<(), Self::Error> {
 ///        self.state = true;
 ///        Ok(())
 ///    }
 /// }
 ///
 /// impl StatefulOutputPin for MyPin {
-///    fn try_is_set_low(&self) -> Result<bool, Self::Error> {
+///    fn is_set_low(&self) -> Result<bool, Self::Error> {
 ///        Ok(!self.state)
 ///    }
-///    fn try_is_set_high(&self) -> Result<bool, Self::Error> {
+///    fn is_set_high(&self) -> Result<bool, Self::Error> {
 ///        Ok(self.state)
 ///    }
 /// }
@@ -135,10 +135,10 @@ pub trait ToggleableOutputPin {
 /// impl toggleable::Default for MyPin {}
 ///
 /// let mut pin = MyPin { state: false };
-/// pin.try_toggle().unwrap();
-/// assert!(pin.try_is_set_high().unwrap());
-/// pin.try_toggle().unwrap();
-/// assert!(pin.try_is_set_low().unwrap());
+/// pin.toggle().unwrap();
+/// assert!(pin.is_set_high().unwrap());
+/// pin.toggle().unwrap();
+/// assert!(pin.is_set_low().unwrap());
 /// ```
 pub mod toggleable {
     use super::{OutputPin, StatefulOutputPin, ToggleableOutputPin};
@@ -153,11 +153,11 @@ pub mod toggleable {
         type Error = P::Error;
 
         /// Toggle pin output
-        fn try_toggle(&mut self) -> Result<(), Self::Error> {
-            if self.try_is_set_low()? {
-                self.try_set_high()
+        fn toggle(&mut self) -> Result<(), Self::Error> {
+            if self.is_set_low()? {
+                self.set_high()
             } else {
-                self.try_set_low()
+                self.set_low()
             }
         }
     }
@@ -169,10 +169,10 @@ pub trait InputPin {
     type Error;
 
     /// Is the input pin high?
-    fn try_is_high(&self) -> Result<bool, Self::Error>;
+    fn is_high(&self) -> Result<bool, Self::Error>;
 
     /// Is the input pin low?
-    fn try_is_low(&self) -> Result<bool, Self::Error>;
+    fn is_low(&self) -> Result<bool, Self::Error>;
 }
 
 /// Single pin that can switch from input to output mode, and vice-versa.
@@ -182,7 +182,7 @@ pub trait InputPin {
 ///
 /// ```
 /// use core::time::Duration;
-/// use embedded_hal::digital::{IoPin, InputPin, OutputPin};
+/// use embedded_hal::blocking::digital::{IoPin, InputPin, OutputPin};
 ///
 /// pub fn ping_and_read<TInputPin, TOutputPin, TError>(
 ///     mut pin: TOutputPin, delay_fn: &dyn Fn(Duration) -> ()) -> Result<bool, TError>
@@ -191,14 +191,14 @@ pub trait InputPin {
 ///     TOutputPin : OutputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error = TError>,
 /// {
 ///     // Ping
-///     pin.try_set_low()?;
+///     pin.set_low()?;
 ///     delay_fn(Duration::from_millis(10));
-///     pin.try_set_high()?;
+///     pin.set_high()?;
 ///
 ///     // Read
-///     let pin = pin.try_into_input_pin()?;
+///     let pin = pin.into_input_pin()?;
 ///     delay_fn(Duration::from_millis(10));
-///     pin.try_is_high()
+///     pin.is_high()
 /// }
 /// ```
 pub trait IoPin<TInput, TOutput>
@@ -212,11 +212,11 @@ where
     /// Tries to convert this pin to input mode.
     ///
     /// If the pin is already in input mode, this method should succeed.
-    fn try_into_input_pin(self) -> Result<TInput, Self::Error>;
+    fn into_input_pin(self) -> Result<TInput, Self::Error>;
 
     /// Tries to convert this pin to output mode with the given initial state.
     ///
     /// If the pin is already in the requested state, this method should
     /// succeed.
-    fn try_into_output_pin(self, state: PinState) -> Result<TOutput, Self::Error>;
+    fn into_output_pin(self, state: PinState) -> Result<TOutput, Self::Error>;
 }

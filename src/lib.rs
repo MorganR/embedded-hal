@@ -75,10 +75,10 @@
 //!     type Error;
 //!
 //!     /// Reads a single byte
-//!     fn try_read(&mut self) -> nb::Result<u8, Self::Error>;
+//!     fn read(&mut self) -> nb::Result<u8, Self::Error>;
 //!
 //!     /// Writes a single byte
-//!     fn try_write(&mut self, byte: u8) -> nb::Result<(), Self::Error>;
+//!     fn write(&mut self, byte: u8) -> nb::Result<(), Self::Error>;
 //! }
 //! ```
 //!
@@ -103,7 +103,7 @@
 //!     // ..
 //!
 //!     /// "waits" until the count down is over
-//!     fn try_wait(&mut self) -> nb::Result<(), Infallible>;
+//!     fn wait(&mut self) -> nb::Result<(), Infallible>;
 //! }
 //!
 //! # fn main() {}
@@ -145,10 +145,10 @@
 //!     // omitted: other error variants
 //! }
 //!
-//! impl hal::serial::Read<u8> for Serial<USART1> {
+//! impl hal::nb::serial::Read<u8> for Serial<USART1> {
 //!     type Error = Error;
 //!
-//!     fn try_read(&mut self) -> nb::Result<u8, Error> {
+//!     fn read(&mut self) -> nb::Result<u8, Error> {
 //!         // read the status register
 //!         let isr = self.usart.isr.read();
 //!
@@ -167,16 +167,16 @@
 //!     }
 //! }
 //!
-//! impl hal::serial::Write<u8> for Serial<USART1> {
+//! impl hal::nb::serial::Write<u8> for Serial<USART1> {
 //!     type Error = Error;
 //!
-//!     fn try_write(&mut self, byte: u8) -> nb::Result<(), Error> {
-//!         // Similar to the `try_read` implementation
+//!     fn write(&mut self, byte: u8) -> nb::Result<(), Error> {
+//!         // Similar to the `read` implementation
 //!         # Ok(())
 //!     }
 //!
-//!     fn try_flush(&mut self) -> nb::Result<(), Error> {
-//!         // Similar to the `try_read` implementation
+//!     fn flush(&mut self) -> nb::Result<(), Error> {
+//!         // Similar to the `read` implementation
 //!         # Ok(())
 //!     }
 //! }
@@ -198,7 +198,7 @@
 //!
 //! ```
 //! use crate::stm32f1xx_hal::Serial1;
-//! use embedded_hal::serial::Write;
+//! use embedded_hal::nb::serial::Write;
 //! use nb::block;
 //!
 //! # fn main() {
@@ -208,9 +208,9 @@
 //! };
 //!
 //! for byte in b"Hello, world!" {
-//!     // NOTE `block!` blocks until `serial.try_write()` completes and returns
+//!     // NOTE `block!` blocks until `serial.write()` completes and returns
 //!     // `Result<(), Error>`
-//!     block!(serial.try_write(*byte)).unwrap();
+//!     block!(serial.write(*byte)).unwrap();
 //! }
 //! # }
 //!
@@ -219,7 +219,7 @@
 //! #     use core::convert::Infallible;
 //! #     pub struct Serial1;
 //! #     impl Serial1 {
-//! #         pub fn try_write(&mut self, _: u8) -> nb::Result<(), Infallible> {
+//! #         pub fn write(&mut self, _: u8) -> nb::Result<(), Infallible> {
 //! #             Ok(())
 //! #         }
 //! #     }
@@ -248,10 +248,10 @@
 //!
 //! fn write_all<S>(serial: &mut S, buffer: &[u8]) -> Result<(), S::Error>
 //! where
-//!     S: hal::serial::Write<u8>
+//!     S: hal::nb::serial::Write<u8>
 //! {
 //!     for &byte in buffer {
-//!         block!(serial.try_write(byte))?;
+//!         block!(serial.write(byte))?;
 //!     }
 //!
 //!     Ok(())
@@ -281,13 +281,13 @@
 //!     timeout: T::Time,
 //! ) -> Result<u8, Error<S::Error, T::Error>>
 //! where
-//!     T: hal::timer::CountDown<Error = ()>,
-//!     S: hal::serial::Read<u8>,
+//!     T: hal::nb::timer::CountDown<Error = ()>,
+//!     S: hal::nb::serial::Read<u8>,
 //! {
-//!     timer.try_start(timeout).map_err(Error::TimedOut)?;
+//!     timer.start(timeout).map_err(Error::TimedOut)?;
 //!
 //!     loop {
-//!         match serial.try_read() {
+//!         match serial.read() {
 //!             // raise error
 //!             Err(nb::Error::Other(e)) => return Err(Error::Serial(e)),
 //!             Err(nb::Error::WouldBlock) => {
@@ -296,9 +296,9 @@
 //!             Ok(byte) => return Ok(byte),
 //!         }
 //!
-//!         match timer.try_wait() {
+//!         match timer.wait() {
 //!             Err(nb::Error::Other(e)) => {
-//!                 // The error type specified by `timer.try_wait()` is `!`, which
+//!                 // The error type specified by `timer.wait()` is `!`, which
 //!                 // means no error can actually occur. The Rust compiler
 //!                 // still forces us to provide this match arm, though.
 //!                 unreachable!()
@@ -325,11 +325,11 @@
 //!
 //! fn flush<S>(serial: &mut S, cb: &mut CircularBuffer)
 //! where
-//!     S: hal::serial::Write<u8, Error = Infallible>,
+//!     S: hal::nb::serial::Write<u8, Error = Infallible>,
 //! {
 //!     loop {
 //!         if let Some(byte) = cb.peek() {
-//!             match serial.try_write(*byte) {
+//!             match serial.write(*byte) {
 //!                 Err(nb::Error::Other(_)) => unreachable!(),
 //!                 Err(nb::Error::WouldBlock) => return,
 //!                 Ok(()) => {}, // keep flushing data
@@ -389,10 +389,10 @@
 //! #     fn deref_mut(&mut self) -> &mut T { self.0 }
 //! # }
 //! # struct Serial1;
-//! # impl hal::serial::Write<u8> for Serial1 {
+//! # impl hal::nb::serial::Write<u8> for Serial1 {
 //! #   type Error = Infallible;
-//! #   fn try_write(&mut self, _: u8) -> nb::Result<(), Infallible> { Err(::nb::Error::WouldBlock) }
-//! #   fn try_flush(&mut self) -> nb::Result<(), Infallible> { Err(::nb::Error::WouldBlock) }
+//! #   fn write(&mut self, _: u8) -> nb::Result<(), Infallible> { Err(::nb::Error::WouldBlock) }
+//! #   fn flush(&mut self) -> nb::Result<(), Infallible> { Err(::nb::Error::WouldBlock) }
 //! # }
 //! # struct CircularBuffer;
 //! # impl CircularBuffer {
@@ -408,19 +408,10 @@
 #![deny(missing_docs)]
 #![no_std]
 
-pub mod adc;
 pub mod blocking;
-pub mod capture;
-pub mod digital;
 pub mod fmt;
+pub mod nb;
 pub mod prelude;
-pub mod pwm;
-pub mod qei;
-pub mod rng;
-pub mod serial;
-pub mod spi;
-pub mod timer;
-pub mod watchdog;
 
 mod private {
     use crate::blocking::i2c::{SevenBitAddress, TenBitAddress};

@@ -6,7 +6,7 @@ pub trait Transfer<W> {
     type Error;
 
     /// Sends `words` to the slave. Returns the `words` received from the slave
-    fn try_transfer<'w>(&mut self, words: &'w mut [W]) -> Result<&'w [W], Self::Error>;
+    fn transfer<'w>(&mut self, words: &'w mut [W]) -> Result<&'w [W], Self::Error>;
 }
 
 /// Blocking write
@@ -15,7 +15,7 @@ pub trait Write<W> {
     type Error;
 
     /// Sends `words` to the slave, ignoring all the incoming words
-    fn try_write(&mut self, words: &[W]) -> Result<(), Self::Error>;
+    fn write(&mut self, words: &[W]) -> Result<(), Self::Error>;
 }
 
 /// Blocking write (iterator version)
@@ -24,7 +24,7 @@ pub trait WriteIter<W> {
     type Error;
 
     /// Sends `words` to the slave, ignoring all the incoming words
-    fn try_write_iter<WI>(&mut self, words: WI) -> Result<(), Self::Error>
+    fn write_iter<WI>(&mut self, words: WI) -> Result<(), Self::Error>
     where
         WI: IntoIterator<Item = W>;
 }
@@ -32,8 +32,8 @@ pub trait WriteIter<W> {
 /// Blocking transfer
 pub mod transfer {
     /// Default implementation of `blocking::spi::Transfer<W>` for implementers of
-    /// `spi::FullDuplex<W>`
-    pub trait Default<W>: crate::spi::FullDuplex<W> {}
+    /// `nonblocking::spi::FullDuplex<W>`
+    pub trait Default<W>: crate::nb::spi::FullDuplex<W> {}
 
     impl<W, S> crate::blocking::spi::Transfer<W> for S
     where
@@ -42,10 +42,10 @@ pub mod transfer {
     {
         type Error = S::Error;
 
-        fn try_transfer<'w>(&mut self, words: &'w mut [W]) -> Result<&'w [W], S::Error> {
+        fn transfer<'w>(&mut self, words: &'w mut [W]) -> Result<&'w [W], S::Error> {
             for word in words.iter_mut() {
-                nb::block!(self.try_send(word.clone()))?;
-                *word = nb::block!(self.try_read())?;
+                nb::block!(self.send(word.clone()))?;
+                *word = nb::block!(self.read())?;
             }
 
             Ok(words)
@@ -55,8 +55,9 @@ pub mod transfer {
 
 /// Blocking write
 pub mod write {
-    /// Default implementation of `blocking::spi::Write<W>` for implementers of `spi::FullDuplex<W>`
-    pub trait Default<W>: crate::spi::FullDuplex<W> {}
+    /// Default implementation of `blocking::spi::Write<W>` for implementers
+    /// of `nonblocking::spi::FullDuplex<W>`
+    pub trait Default<W>: crate::nb::spi::FullDuplex<W> {}
 
     impl<W, S> crate::blocking::spi::Write<W> for S
     where
@@ -65,10 +66,10 @@ pub mod write {
     {
         type Error = S::Error;
 
-        fn try_write(&mut self, words: &[W]) -> Result<(), S::Error> {
+        fn write(&mut self, words: &[W]) -> Result<(), S::Error> {
             for word in words {
-                nb::block!(self.try_send(word.clone()))?;
-                nb::block!(self.try_read())?;
+                nb::block!(self.send(word.clone()))?;
+                nb::block!(self.read())?;
             }
 
             Ok(())
@@ -79,8 +80,8 @@ pub mod write {
 /// Blocking write (iterator version)
 pub mod write_iter {
     /// Default implementation of `blocking::spi::WriteIter<W>` for implementers of
-    /// `spi::FullDuplex<W>`
-    pub trait Default<W>: crate::spi::FullDuplex<W> {}
+    /// `nonblocking::spi::FullDuplex<W>`
+    pub trait Default<W>: crate::nb::spi::FullDuplex<W> {}
 
     impl<W, S> crate::blocking::spi::WriteIter<W> for S
     where
@@ -89,13 +90,13 @@ pub mod write_iter {
     {
         type Error = S::Error;
 
-        fn try_write_iter<WI>(&mut self, words: WI) -> Result<(), S::Error>
+        fn write_iter<WI>(&mut self, words: WI) -> Result<(), S::Error>
         where
             WI: IntoIterator<Item = W>,
         {
             for word in words.into_iter() {
-                nb::block!(self.try_send(word.clone()))?;
-                nb::block!(self.try_read())?;
+                nb::block!(self.send(word.clone()))?;
+                nb::block!(self.read())?;
             }
 
             Ok(())
@@ -121,7 +122,7 @@ pub trait Transactional<W: 'static> {
     type Error;
 
     /// Execute the provided transactions
-    fn try_exec<'a>(&mut self, operations: &mut [Operation<'a, W>]) -> Result<(), Self::Error>;
+    fn exec<'a>(&mut self, operations: &mut [Operation<'a, W>]) -> Result<(), Self::Error>;
 }
 
 /// Blocking transactional impl over spi::Write and spi::Transfer
@@ -139,11 +140,11 @@ pub mod transactional {
     {
         type Error = E;
 
-        fn try_exec<'a>(&mut self, operations: &mut [super::Operation<'a, W>]) -> Result<(), E> {
+        fn exec<'a>(&mut self, operations: &mut [super::Operation<'a, W>]) -> Result<(), E> {
             for op in operations {
                 match op {
-                    Operation::Write(w) => self.try_write(w)?,
-                    Operation::Transfer(t) => self.try_transfer(t).map(|_| ())?,
+                    Operation::Write(w) => self.write(w)?,
+                    Operation::Transfer(t) => self.transfer(t).map(|_| ())?,
                 }
             }
 
